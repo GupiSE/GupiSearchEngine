@@ -138,8 +138,10 @@ public class GuPiDataBase {
 
                 wordId = getWordId(keyWord);
                 documentId = getDocumentId(keyDoc);
-                float tf = (float)wordHM.get(keyWord).get(keyDoc)/(float)documents.get(keyDoc);
-                float idf = (float) Math.log(documents.size()/(wordHM.get(keyWord).size()));
+                //float tf = (float)wordHM.get(keyWord).get(keyDoc)/(float)documents.get(keyDoc);
+
+                float tf = (float)wordHM.get(keyWord).get(keyDoc);
+                float idf = (float) Math.log((double)documents.size()/((double)wordHM.get(keyWord).size()));
                 state.executeUpdate("INSERT INTO frequency (idWord, idDocument, frequency, idf) VALUES('"+wordId+"','"+documentId+"','"+tf+"','"+idf+"')");
             }
         }
@@ -277,25 +279,66 @@ public class GuPiDataBase {
         String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
         String[] tabTemp = new String[tabTemp2.length];
         for(int j=0; j<tabTemp2.length; j++){
-            if(tabTemp2[j].length()>7) {
-                tabTemp[j] = tabTemp2[j].substring(0, 7);
-            }else {
-                tabTemp[j] = tabTemp2[j];
+            if((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                if (tabTemp2[j].length() > 7) {
+                    tabTemp[j] = tabTemp2[j].substring(0, 7);
+                } else {
+                    tabTemp[j] = tabTemp2[j];
+                }
             }
         }
+
 
 
 
         HashMap<String,Float> result = new HashMap<>();
 
         for(int i=0; i<tabTemp.length; i++){
-            addHashMap(result, wordRequestWithTf(tabTemp[i]));
+            addHashMap(result, wordRequestWithTf(tabTemp[i]),1);
         }
 
         TfComparator tfComparator = new TfComparator(result);
         TreeMap<String,Float> treeMap = new TreeMap<>(tfComparator);
         treeMap.putAll(result);
 
+        return treeMap;
+    }
+
+
+    public TreeMap<String,Float> wordsRequestWithTfWeight(List<WordWeight> listWords){
+        HashMap<String, Float> result = new HashMap<>();
+
+        for(int k = 0 ; k<listWords.size() ; k++) {
+
+            String temp = Normalizer
+                    .normalize(listWords.get(k).getWord().toLowerCase(), Normalizer.Form.NFD)
+                    .replaceAll("[^\\p{ASCII}]", "");
+
+            String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
+            String[] tabTemp = new String[tabTemp2.length];
+            for (int j = 0; j < tabTemp2.length; j++) {
+                if ((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                    if (tabTemp2[j].length() > 7) {
+                        tabTemp[j] = tabTemp2[j].substring(0, 7);
+                    } else {
+                        tabTemp[j] = tabTemp2[j];
+                    }
+                }
+            }
+
+
+
+
+
+            for (int i = 0; i < tabTemp.length; i++) {
+                addHashMap(result, wordRequestWithTf(tabTemp[i]),listWords.get(k).getWeight());
+            }
+
+        }
+
+        TfComparator tfComparator = new TfComparator(result);
+        TreeMap<String,Float> treeMap = new TreeMap<>(tfComparator);
+        treeMap.putAll(result);
 
         return treeMap;
     }
@@ -310,16 +353,18 @@ public class GuPiDataBase {
         String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
         String[] tabTemp = new String[tabTemp2.length];
         for(int j=0; j<tabTemp2.length; j++){
-            if(tabTemp2[j].length()>7) {
-                tabTemp[j] = tabTemp2[j].substring(0, 7);
-            }else {
-                tabTemp[j] = tabTemp2[j];
+            if((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                if (tabTemp2[j].length() > 7) {
+                    tabTemp[j] = tabTemp2[j].substring(0, 7);
+                } else {
+                    tabTemp[j] = tabTemp2[j];
+                }
             }
         }
         HashMap<String,Float> result = new HashMap<>();
 
         for(int i=0; i<tabTemp.length; i++){
-            addHashMap(result, wordRequestWithIdf(tabTemp[i]));
+            addHashMap(result, wordRequestWithIdf(tabTemp[i]),1);
         }
 
         TfComparator tfComparator = new TfComparator(result);
@@ -330,45 +375,110 @@ public class GuPiDataBase {
         return treeMap;
     }
 
-    private void addHashMap(HashMap<String, Float> result, HashMap<String, Float> stringFloatHashMap) {
+    public TreeMap<String,Float> wordsRequestWithIdfWeight(List<WordWeight> listWords){
+        HashMap<String, Float> result = new HashMap<>();
+
+        for(int k = 0 ; k<listWords.size() ; k++) {
+            String temp = Normalizer
+                    .normalize(listWords.get(k).getWord().toLowerCase(), Normalizer.Form.NFD)
+                    .replaceAll("[^\\p{ASCII}]", "");
+
+            String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
+            String[] tabTemp = new String[tabTemp2.length];
+            for (int j = 0; j < tabTemp2.length; j++) {
+                if ((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                    if (tabTemp2[j].length() > 7) {
+                        tabTemp[j] = tabTemp2[j].substring(0, 7);
+                    } else {
+                        tabTemp[j] = tabTemp2[j];
+                    }
+                }
+            }
+
+            for (int i = 0; i < tabTemp.length; i++) {
+                addHashMap(result, wordRequestWithIdf(tabTemp[i]), listWords.get(k).getWeight());
+            }
+        }
+
+        TfComparator tfComparator = new TfComparator(result);
+        TreeMap<String,Float> treeMap = new TreeMap<>(tfComparator);
+        treeMap.putAll(result);
+
+
+        return treeMap;
+    }
+
+    private void addHashMap(HashMap<String, Float> result, HashMap<String, Float> stringFloatHashMap, float weight) {
 
         for( String key : stringFloatHashMap.keySet()){
 
             if(result.containsKey(key)){
-                result.put(key,result.get(key)+stringFloatHashMap.get(key));
+                result.put(key,result.get(key)+(stringFloatHashMap.get(key)*weight));
             }else{
-                result.put(key,stringFloatHashMap.get(key));
+                result.put(key,(stringFloatHashMap.get(key)*weight));
             }
         }
     }
 
-    public TreeMap<String,Float> wordsRequestCos(String words) throws SQLException {
+    public TreeMap<String,Float> wordsRequestCos(String words) {
 
-        HashMap<String,HashMap<String,Float>> docHM;
-        String temp = Normalizer
-                .normalize(words.toLowerCase(), Normalizer.Form.NFD)
-                .replaceAll("[^\\p{ASCII}]", "");
+        TreeMap<String,Float> finalResult = null;
+        try{
+            HashMap<String,HashMap<String,Float>> docHM;
+            String temp = Normalizer
+                    .normalize(words.toLowerCase(), Normalizer.Form.NFD)
+                    .replaceAll("[^\\p{ASCII}]", "");
 
-        String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
-        String[] tabTemp = new String[tabTemp2.length];
-        for(int j=0; j<tabTemp2.length; j++){
-            if(tabTemp2[j].length()>7) {
-                tabTemp[j] = tabTemp2[j].substring(0, 7);
-            }else {
-                tabTemp[j] = tabTemp2[j];
+            String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
+            String[] tabTemp = new String[tabTemp2.length];
+            for(int j=0; j<tabTemp2.length; j++){
+                if((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                    if (tabTemp2[j].length() > 7) {
+                        tabTemp[j] = tabTemp2[j].substring(0, 7);
+                    } else {
+                        tabTemp[j] = tabTemp2[j];
+                    }
+                }
             }
+
+            docHM = getDocHMContainingWords(tabTemp);
+            HashMap<String,Float> docAndDistanceHM = new HashMap<>();
+            for(String keyDoc : docHM.keySet()){
+                docAndDistanceHM.put(keyDoc,computeDistance(docHM.get(keyDoc),tabTemp));
+            }
+            TfComparator tfComparator = new TfComparator(docAndDistanceHM);
+            finalResult = new TreeMap<String,Float>(tfComparator);
+            finalResult.putAll(docAndDistanceHM);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+        return finalResult;
+    }
 
-        docHM = getDocHMContainingWords(tabTemp);
-        HashMap<String,Float> docAndDistanceHM = new HashMap<>();
-        for(String keyDoc : docHM.keySet()){
-            docAndDistanceHM.put(keyDoc,computeDistance(docHM.get(keyDoc),tabTemp));
+
+    public TreeMap<String,Float> wordsRequestCosWeight(List<WordWeight> listWords) {
+
+        TreeMap<String,Float> finalResult = null;
+        try {
+
+            HashMap<String,HashMap<String,Float>> docHM;
+
+            List<WordWeight> splitList = splitWordWeight(listWords);
+
+
+            docHM = getDocHMContainingWords(splitList);
+            HashMap<String,Float> docAndDistanceHM = new HashMap<>();
+            for(String keyDoc : docHM.keySet()){
+                docAndDistanceHM.put(keyDoc,computeDistanceWeight(docHM.get(keyDoc), splitList));
+            }
+            TfComparator tfComparator = new TfComparator(docAndDistanceHM);
+            finalResult = new TreeMap<String,Float>(tfComparator);
+            finalResult.putAll(docAndDistanceHM);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
-
-        TfComparator tfComparator = new TfComparator(docAndDistanceHM);
-        TreeMap<String,Float> finalResult = new TreeMap<String,Float>(tfComparator);
-        finalResult.putAll(docAndDistanceHM);
-
         return finalResult;
     }
 
@@ -379,16 +489,57 @@ public class GuPiDataBase {
         float normLAHAUT = 0;
 
         for(int i=0; i<request.length; i++){
-            normR = normR + ((1/(float)request.length)*(1/(float)request.length));
+//            normR = normR + ((1/(float)request.length)*(1/(float)request.length));
+//            if(wordsHM.containsKey(request[i])){
+//                normLAHAUT = normLAHAUT +
+//                        (wordsHM.get(request[i])*(1/(float)request.length))*(wordsHM.get(request[i])*(1/(float)request.length));
+//
+//            }
+
+            normR++;
             if(wordsHM.containsKey(request[i])){
-                normLAHAUT = normLAHAUT + (wordsHM.get(request[i])*(1/(float)request.length))*(wordsHM.get(request[i])*(1/(float)request.length));
+                normLAHAUT = normLAHAUT +
+                        (wordsHM.get(request[i]))*(wordsHM.get(request[i]));
 
             }
-            for(String keyWord : wordsHM.keySet()){
-                normD = normD + (wordsHM.get(keyWord)*wordsHM.get(keyWord));
 
-            }
         }
+
+        for(String keyWord : wordsHM.keySet()){
+            normD = normD + (wordsHM.get(keyWord)*wordsHM.get(keyWord));
+
+        }
+
+
+        normR = (float)Math.sqrt(normR);
+        normD = (float)Math.sqrt(normD);
+        normLAHAUT = (float)Math.sqrt(normLAHAUT);
+        //System.out.println("NORMES : D " + normD + " R " + normR + " LAHAUT " + normLAHAUT);
+        Float result = normLAHAUT/(normD*normR);
+
+        return result;
+    }
+
+    private float computeDistanceWeight(HashMap<String,Float> wordsHM,List<WordWeight> listWords){
+
+        float normR = 0;
+        float normD = 0;
+        float normLAHAUT = 0;
+
+        for (int i = 0; i < listWords.size() ; i++) {
+                normR++;
+                if (wordsHM.containsKey(listWords.get(i).getWord())) {
+                    normLAHAUT = normLAHAUT +
+                            listWords.get(i).getWeight()*(wordsHM.get(listWords.get(i).getWord())) * (wordsHM.get(listWords.get(i).getWord()));
+                }
+        }
+
+            for (String keyWord : wordsHM.keySet()) {
+                normD = normD + (wordsHM.get(keyWord) * wordsHM.get(keyWord));
+
+            }
+
+
 
         normR = (float)Math.sqrt(normR);
         normD = (float)Math.sqrt(normD);
@@ -430,7 +581,8 @@ public class GuPiDataBase {
         ResultSet res = state.executeQuery("SELECT * FROM frequency WHERE idDocument='"+docId+"'");
 
         while ((res.next())){
-            result.put(getWordFromId(res.getInt("idWord")),res.getFloat("idf")*res.getFloat("frequency"));
+            result.put(getWordFromId(res.getInt("idWord")),res.getFloat("frequency")*res.getFloat("idf"));
+
         }
 
         return result;
@@ -472,7 +624,40 @@ public class GuPiDataBase {
         return result;
     }
 
+    private List<Integer> getDocIdsContainingWords(List<WordWeight> words) throws SQLException {
+
+
+        List<Integer> result = new ArrayList<>();
+
+        List<Integer> temp;
+
+        for(int i = 0; i<words.size() ; i++){
+            temp = getDocIdsContainingWord(words.get(i).getWord());
+
+            for(int j = 0; j<temp.size() ; j++){
+                if(!result.contains(temp.get(j))){
+                    result.add(temp.get(j));
+                }
+            }
+        }
+
+        return result;
+    }
+
     private HashMap<String,HashMap<String,Float>> getDocHMContainingWords(String[] words) throws SQLException {
+
+        HashMap<String,HashMap<String,Float>> result = new HashMap<>();
+        List<Integer> docIds = getDocIdsContainingWords(words);
+
+        for (int i = 0 ; i < docIds.size() ; i++){
+            result.put(getDocNameFromId(docIds.get(i)),getWordsForDocId(docIds.get(i)));
+        }
+
+
+        return result;
+    }
+
+    private HashMap<String,HashMap<String,Float>> getDocHMContainingWords(List<WordWeight> words) throws SQLException {
 
         HashMap<String,HashMap<String,Float>> result = new HashMap<>();
         List<Integer> docIds = getDocIdsContainingWords(words);
@@ -487,6 +672,27 @@ public class GuPiDataBase {
 
 
 
+    private List<WordWeight> splitWordWeight(List<WordWeight> listToSplit){
+        List<WordWeight> result = new ArrayList<>();
+        for ( int i = 0 ; i<listToSplit.size() ; i++){
+            String temp = Normalizer
+                    .normalize(listToSplit.get(i).getWord().toLowerCase(), Normalizer.Form.NFD)
+                    .replaceAll("[^\\p{ASCII}]", "");
+
+            String[] tabTemp2 = temp.split("[^a-zA-Z0-9]");
+            for(int j=0; j<tabTemp2.length; j++){
+                if((new GupiParser()).isAcceptable(tabTemp2[j])) {
+                    if (tabTemp2[j].length() > 7) {
+                        result.add(new WordWeight(tabTemp2[j].substring(0, 7),listToSplit.get(i).getWeight()));
+                    } else {
+                        result.add(new WordWeight(tabTemp2[j],listToSplit.get(i).getWeight()));
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
 
 
 
